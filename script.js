@@ -1,0 +1,391 @@
+import { getDatabase, ref, onValue, push, remove, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+const config = window.MY_STORE_CONFIG;
+const db = getDatabase(window.app);
+
+window.checkLogin = function() {
+    const code = document.getElementById('login-input').value.toString().trim();
+    if(code === config.security.adminCode.toString().trim()) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-container').style.display = 'block';
+    } else {
+        document.getElementById('login-error').style.display = 'block';
+    }
+}
+
+window.switchTab = function(tabId, btnElement) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btnElement.classList.add('active');
+    window.scrollTo(0,0);
+}
+
+window.showDesignSection = function(sectionId) {
+    document.getElementById('design-menu').style.display = 'none';
+    document.getElementById('banner-section').style.display = 'none';
+    document.getElementById('category-section').style.display = 'none';
+    if(sectionId === 'menu') {
+        document.getElementById('design-menu').style.display = 'block';
+    } else {
+        document.getElementById(sectionId).style.display = 'block';
+    }
+}
+
+window.compressImage = function(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                let width = img.width;
+                let height = img.height;
+                const maxWidth = 1080;
+                const maxHeight = 1080;
+                
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                resolve(dataUrl);
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+onValue(ref(db, 'banners'), snapshot => {
+    const list = document.getElementById('banners-list-container');
+    list.innerHTML = "";
+    const data = snapshot.val();
+    if(data) {
+        Object.keys(data).forEach(key => {
+            const b = data[key];
+            list.innerHTML += `<div class="banner-list-item"><div style="display:flex; align-items:center; gap:10px;"><img src="${b.image}" class="banner-preview"><span style="font-size:12px;">${b.title || 'بدون عنوان'}</span></div><button class="delete-btn" onclick="deleteBanner('${key}')">X</button></div>`;
+        });
+    } else { list.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد بنرات حالياً</p>"; }
+});
+
+window.uploadBanner = async function() {
+    const title = document.getElementById('banner-title').value;
+    const fileInput = document.getElementById('banner-img');
+    if(fileInput.files.length === 0) return alert("اختر صورة");
+    document.getElementById('banner-status').innerText = "جاري الرفع...";
+    
+    const imgUrl = await compressImage(fileInput.files[0]);
+    
+    if(imgUrl) {
+        push(ref(db, 'banners'), { title: title, image: imgUrl });
+        document.getElementById('banner-status').innerText = "✅ تم";
+        document.getElementById('banner-status').style.color = "green";
+        fileInput.value = ""; document.getElementById('banner-title').value = "";
+    }
+}
+window.deleteBanner = function(key) { if(confirm("حذف هذا البنر؟")) remove(ref(db, 'banners/' + key)); }
+
+onValue(ref(db, 'categories'), snapshot => {
+    const select = document.getElementById('p-cat-select');
+    const listManage = document.getElementById('categories-list-manage');
+    select.innerHTML = '<option value="general">عام</option>'; 
+    listManage.innerHTML = "";
+    const data = snapshot.val();
+    if(data) {
+        Object.keys(data).forEach(key => {
+            const cat = data[key];
+            select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+            listManage.innerHTML += `<div class="banner-list-item"><div style="display:flex; align-items:center; gap:10px;"><img src="${cat.image}" class="banner-preview" style="border-radius:50%;"><span style="font-size:12px;">${cat.name}</span></div><div><button class="delete-btn" style="background:#3498db; margin-left:5px;" onclick="editCategory('${key}')">تعديل</button><button class="delete-btn" onclick="deleteCategory('${key}')">X</button></div></div>`;
+        });
+    } else { listManage.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد تصنيفات</p>"; }
+});
+
+window.uploadCategory = async function() {
+    const name = document.getElementById('cat-name-new').value;
+    const fileInput = document.getElementById('cat-img-new');
+    if(!name || fileInput.files.length === 0) return alert("البيانات ناقصة");
+    document.getElementById('cat-status').innerText = "جاري...";
+    
+    const imgUrl = await compressImage(fileInput.files[0]);
+    
+    if(imgUrl) {
+        const catId = name.replace(/\s+/g, '_'); 
+        push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId });
+        document.getElementById('cat-status').innerText = "✅ تم";
+        fileInput.value = ""; document.getElementById('cat-name-new').value = "";
+    }
+}
+window.deleteCategory = function(key) { if(confirm("حذف هذا التصنيف؟")) remove(ref(db, 'categories/' + key)); }
+
+window.editCategory = function(key) {
+    import("https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js").then((mod) => {
+        mod.get(mod.ref(db, 'categories/' + key)).then(snapshot => {
+            const data = snapshot.val();
+            document.getElementById('cat-name-new').value = data.name;
+            document.getElementById('cat-action-btn').innerText = "تحديث التصنيف";
+            document.getElementById('cat-action-btn').onclick = function() { updateCategory(key, data.image); };
+            window.scrollTo(0,0);
+        });
+    });
+}
+
+window.updateCategory = async function(key, oldImage) {
+    const name = document.getElementById('cat-name-new').value;
+    const fileInput = document.getElementById('cat-img-new');
+    if(!name) return alert("الاسم مطلوب");
+    document.getElementById('cat-status').innerText = "جاري التحديث...";
+    
+    let imgUrl = oldImage;
+    if(fileInput.files.length > 0) {
+        imgUrl = await compressImage(fileInput.files[0]);
+    }
+    
+    update(ref(db, 'categories/' + key), { name: name, image: imgUrl }).then(() => {
+        document.getElementById('cat-status').innerText = "✅ تم التحديث";
+        resetCategoryForm();
+    });
+}
+
+window.resetCategoryForm = function() {
+    document.getElementById('cat-name-new').value = "";
+    document.getElementById('cat-img-new').value = "";
+    document.getElementById('cat-action-btn').innerText = "إنشاء التصنيف";
+    document.getElementById('cat-action-btn').onclick = uploadCategory;
+}
+
+onValue(ref(db, 'products'), snapshot => {
+    const list = document.getElementById('products-list-manage');
+    list.innerHTML = "";
+    const data = snapshot.val();
+    if(data) {
+        Object.keys(data).reverse().forEach(key => {
+            const p = data[key];
+            list.innerHTML += `<div class="banner-list-item"><div style="display:flex; align-items:center; gap:10px;"><img src="${p.image}" class="banner-preview"><div style="font-size:12px;"><div>${p.title}</div><div style="color:red;">${p.price || 0} د.ع</div></div></div><div><button class="delete-btn" style="background:#3498db; margin-left:5px;" onclick="editProduct('${key}')">تعديل</button><button class="delete-btn" onclick="deleteProduct('${key}')">X</button></div></div>`;
+        });
+    } else { list.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد منتجات</p>"; }
+});
+
+window.addDynamicButton = function() {
+    const container = document.getElementById('dynamic-buttons-container');
+    const div = document.createElement('div');
+    div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '5px';
+    div.innerHTML = `<input type="text" class="btn-name" placeholder="تسمية الزر"><input type="url" class="btn-url" placeholder="رابط الدخول"><button class="delete-btn" onclick="this.parentElement.remove()" style="margin:8px 0;">X</button>`;
+    container.appendChild(div);
+}
+
+window.uploadProduct = async function() {
+    const fileInput = document.getElementById('p-img');
+    const imagesInput = document.getElementById('p-images');
+    const name = document.getElementById('p-name').value;
+    const price = document.getElementById('p-price').value;
+    const desc = document.getElementById('p-desc').value;
+    const cat = document.getElementById('p-cat-select').value;
+    
+    if(fileInput.files.length === 0 || !name) return alert("البيانات ناقصة (الصورة الأساسية والاسم مطلوبان)");
+    document.getElementById('prod-status').innerText = "جاري الرفع...";
+    
+    const btns = [];
+    document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
+        const bName = div.querySelector('.btn-name').value;
+        const bUrl = div.querySelector('.btn-url').value;
+        if(bName && bUrl) btns.push({ name: bName, url: bUrl });
+    });
+
+    const imgUrl = await compressImage(fileInput.files[0]);
+    
+    const extraImages = [];
+    for(let i=0; i < imagesInput.files.length; i++) {
+        const extraImg = await compressImage(imagesInput.files[i]);
+        extraImages.push(extraImg);
+    }
+    
+    if(imgUrl) {
+        await push(ref(db, 'products'), { 
+            image: imgUrl, 
+            images: extraImages,
+            title: name, 
+            price: price,
+            description: desc, 
+            category: cat, 
+            buttons: btns, 
+            date: serverTimestamp() 
+        });
+        document.getElementById('prod-status').innerText = "✅ تم النشر";
+        resetProductForm();
+    }
+}
+window.deleteProduct = function(key) { if(confirm("حذف هذا المنتج؟")) remove(ref(db, 'products/' + key)); }
+
+window.editProduct = function(key) {
+    import("https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js").then((mod) => {
+        mod.get(mod.ref(db, 'products/' + key)).then(snapshot => {
+            const data = snapshot.val();
+            document.getElementById('p-name').value = data.title;
+            document.getElementById('p-price').value = data.price || '';
+            document.getElementById('p-desc').value = data.description || '';
+            document.getElementById('p-cat-select').value = data.category || 'general';
+            
+            const btnsContainer = document.getElementById('dynamic-buttons-container');
+            btnsContainer.innerHTML = '';
+            if(data.buttons) {
+                data.buttons.forEach(b => {
+                    const div = document.createElement('div');
+                    div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '5px';
+                    div.innerHTML = `<input type="text" class="btn-name" placeholder="تسمية الزر" value="${b.name}"><input type="url" class="btn-url" placeholder="رابط الدخول" value="${b.url}"><button class="delete-btn" onclick="this.parentElement.remove()" style="margin:8px 0;">X</button>`;
+                    btnsContainer.appendChild(div);
+                });
+            }
+            
+            document.getElementById('prod-action-btn').innerText = "تحديث المنتج";
+            document.getElementById('prod-action-btn').onclick = function() { updateProduct(key, data.image, data.images); };
+            switchTab('tab-add-product', document.querySelector('.nav-btn:first-child'));
+        });
+    });
+}
+
+window.updateProduct = async function(key, oldImage, oldImages) {
+    const name = document.getElementById('p-name').value;
+    const price = document.getElementById('p-price').value;
+    const desc = document.getElementById('p-desc').value;
+    const cat = document.getElementById('p-cat-select').value;
+    const fileInput = document.getElementById('p-img');
+    const imagesInput = document.getElementById('p-images');
+    
+    if(!name) return alert("الاسم مطلوب");
+    document.getElementById('prod-status').innerText = "جاري التحديث...";
+    
+    const btns = [];
+    document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
+        const bName = div.querySelector('.btn-name').value;
+        const bUrl = div.querySelector('.btn-url').value;
+        if(bName && bUrl) btns.push({ name: bName, url: bUrl });
+    });
+    
+    let imgUrl = oldImage;
+    if(fileInput.files.length > 0) {
+        imgUrl = await compressImage(fileInput.files[0]);
+    }
+
+    let extraImages = oldImages || [];
+    if(imagesInput.files.length > 0) {
+        extraImages = [];
+        for(let i=0; i < imagesInput.files.length; i++) {
+            const extraImg = await compressImage(imagesInput.files[i]);
+            extraImages.push(extraImg);
+        }
+    }
+    
+    update(ref(db, 'products/' + key), { 
+        title: name, 
+        price: price,
+        description: desc, 
+        category: cat, 
+        buttons: btns, 
+        image: imgUrl,
+        images: extraImages
+    }).then(() => {
+        document.getElementById('prod-status').innerText = "✅ تم التحديث";
+        resetProductForm();
+    });
+}
+
+window.resetProductForm = function() {
+    document.getElementById('p-name').value = "";
+    document.getElementById('p-price').value = "";
+    document.getElementById('p-desc').value = "";
+    document.getElementById('p-img').value = "";
+    document.getElementById('p-images').value = "";
+    document.getElementById('dynamic-buttons-container').innerHTML = "";
+    document.getElementById('prod-action-btn').innerText = "نشر المنتج الآن";
+    document.getElementById('prod-action-btn').onclick = uploadProduct;
+}
+
+onValue(ref(db, 'orders'), snapshot => {
+    const pendingList = document.getElementById('pending-orders-list');
+    const completedList = document.getElementById('completed-orders-list');
+    if(!pendingList || !completedList) return;
+    
+    pendingList.innerHTML = "";
+    completedList.innerHTML = "";
+    
+    const data = snapshot.val();
+    if(data) {
+        let hasPending = false;
+        let hasCompleted = false;
+
+        Object.keys(data).reverse().forEach(key => {
+            const order = data[key];
+            
+            let orderItemsHtml = "";
+            if(order.cart && Array.isArray(order.cart)) {
+                order.cart.forEach(item => {
+                    orderItemsHtml += `
+                        <div style="display:flex; align-items:center; gap:10px; margin-top:5px; padding:5px; border-bottom:1px solid #eee;">
+                            <img src="${item.image}" style="width:50px; height:50px; object-fit:contain; border-radius:4px; border:1px solid #ddd;">
+                            <div style="font-size:13px; font-weight:bold;">${item.title} (الكمية: ${item.qty})</div>
+                        </div>
+                    `;
+                });
+            }
+
+            const orderHtml = `
+                <div class="order-item">
+                    <div class="order-header">
+                        <span>طلب #${key.substring(1, 6)}</span>
+                    </div>
+                    <div class="order-details">
+                        <div>الاسم: ${order.name}</div>
+                        <div>رقم الهاتف: ${order.phone}</div>
+                        <div>المحافظة: ${order.gov}</div>
+                        <div>العنوان/أقرب نقطة دالة: ${order.address}</div>
+                        <div style="margin-top:10px; font-weight:bold;">المنتجات:</div>
+                        ${orderItemsHtml}
+                    </div>
+                    ${order.status === 'completed' ? '' : `<button class="action-btn" style="width:100%; margin-top:15px; background:#2ecc71;" onclick="markOrderCompleted('${key}')">تمت المراجعة</button>`}
+                    <button class="delete-btn" style="width:100%; margin-top:10px; padding:12px; background:#ff4757;" onclick="deleteOrder('${key}')">حذف الطلب</button>
+                </div>
+            `;
+
+            if(order.status === 'completed') {
+                completedList.innerHTML += orderHtml;
+                hasCompleted = true;
+            } else {
+                pendingList.innerHTML += orderHtml;
+                hasPending = true;
+            }
+        });
+
+        if(!hasPending) pendingList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات قيد المراجعة</p>";
+        if(!hasCompleted) completedList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات منتهية</p>";
+
+    } else {
+        pendingList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات قيد المراجعة</p>";
+        completedList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات منتهية</p>";
+    }
+});
+
+window.markOrderCompleted = function(key) {
+    if(confirm("نقل الطلب إلى المنتهية؟")) {
+        update(ref(db, 'orders/' + key), { status: 'completed' });
+    }
+}
+
+window.deleteOrder = function(key) {
+    if(confirm("هل أنت متأكد من حذف هذا الطلب نهائياً؟")) {
+        remove(ref(db, 'orders/' + key));
+    }
+}
