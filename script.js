@@ -34,41 +34,53 @@ window.showDesignSection = function(sectionId) {
 }
 
 window.compressImage = function(file) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+        if (!file) { resolve(null); return; }
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = new Image();
-            img.src = event.target.result;
             img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                let width = img.width;
-                let height = img.height;
-                const maxWidth = 1080;
-                const maxHeight = 1080;
-                
-                if (width > height) {
-                    if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxWidth = 800; 
+                    const maxHeight = 800;
+                    
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
                     }
-                } else {
-                    if (height > maxHeight) {
-                        width *= maxHeight / height;
-                        height = maxHeight;
-                    }
-                }
-                
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                resolve(dataUrl);
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+                    resolve(dataUrl);
+                } catch(e) { reject(new Error("فشل معالجة الصورة")); }
             };
+            img.onerror = () => reject(new Error("الصورة غير صالحة"));
+            img.src = event.target.result;
         };
+        reader.onerror = () => reject(new Error("فشل قراءة الملف"));
         reader.readAsDataURL(file);
     });
+}
+
+function withTimeout(promise, ms, timeoutError) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutError)), ms))
+    ]);
 }
 
 onValue(ref(db, 'banners'), snapshot => {
@@ -92,7 +104,11 @@ window.uploadBanner = async function() {
     try {
         const imgUrl = await compressImage(fileInput.files[0]);
         if(imgUrl) {
-            await push(ref(db, 'banners'), { title: title, image: imgUrl });
+            await withTimeout(
+                push(ref(db, 'banners'), { title: title, image: imgUrl }),
+                8000,
+                "الاتصال بقاعدة البيانات مفقود. يرجى التأكد من تفعيل Realtime Database وتعديل القواعد إلى true"
+            );
             document.getElementById('banner-status').innerText = "✅ تم";
             document.getElementById('banner-status').style.color = "green";
             fileInput.value = ""; document.getElementById('banner-title').value = "";
@@ -129,7 +145,11 @@ window.uploadCategory = async function() {
         const imgUrl = await compressImage(fileInput.files[0]);
         if(imgUrl) {
             const catId = name.replace(/\s+/g, '_'); 
-            await push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId });
+            await withTimeout(
+                push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId }),
+                8000,
+                "الاتصال بقاعدة البيانات مفقود. يرجى التأكد من تفعيل Realtime Database وتعديل القواعد إلى true"
+            );
             document.getElementById('cat-status').innerText = "✅ تم";
             fileInput.value = ""; document.getElementById('cat-name-new').value = "";
         }
@@ -164,7 +184,12 @@ window.updateCategory = async function(key, oldImage) {
             imgUrl = await compressImage(fileInput.files[0]);
         }
         
-        await update(ref(db, 'categories/' + key), { name: name, image: imgUrl });
+        await withTimeout(
+            update(ref(db, 'categories/' + key), { name: name, image: imgUrl }),
+            8000,
+            "الاتصال بقاعدة البيانات مفقود."
+        );
+        
         document.getElementById('cat-status').innerText = "✅ تم التحديث";
         resetCategoryForm();
     } catch (error) {
@@ -224,20 +249,24 @@ window.uploadProduct = async function() {
         const extraImages = [];
         for(let i=0; i < imagesInput.files.length; i++) {
             const extraImg = await compressImage(imagesInput.files[i]);
-            extraImages.push(extraImg);
+            if(extraImg) extraImages.push(extraImg);
         }
         
         if(imgUrl) {
-            await push(ref(db, 'products'), { 
-                image: imgUrl, 
-                images: extraImages,
-                title: name, 
-                price: price,
-                description: desc, 
-                category: cat, 
-                buttons: btns, 
-                date: serverTimestamp() 
-            });
+            await withTimeout(
+                push(ref(db, 'products'), { 
+                    image: imgUrl, 
+                    images: extraImages,
+                    title: name, 
+                    price: price,
+                    description: desc, 
+                    category: cat, 
+                    buttons: btns, 
+                    date: serverTimestamp() 
+                }),
+                8000,
+                "الاتصال بقاعدة البيانات مفقود. تأكد من تفعيل Realtime Database وتعديل القواعد (Rules) إلى true"
+            );
             document.getElementById('prod-status').innerText = "✅ تم النشر";
             resetProductForm();
         }
@@ -304,19 +333,23 @@ window.updateProduct = async function(key, oldImage, oldImages) {
             extraImages = [];
             for(let i=0; i < imagesInput.files.length; i++) {
                 const extraImg = await compressImage(imagesInput.files[i]);
-                extraImages.push(extraImg);
+                if(extraImg) extraImages.push(extraImg);
             }
         }
         
-        await update(ref(db, 'products/' + key), { 
-            title: name, 
-            price: price,
-            description: desc, 
-            category: cat, 
-            buttons: btns, 
-            image: imgUrl,
-            images: extraImages
-        });
+        await withTimeout(
+            update(ref(db, 'products/' + key), { 
+                title: name, 
+                price: price,
+                description: desc, 
+                category: cat, 
+                buttons: btns, 
+                image: imgUrl,
+                images: extraImages
+            }),
+            8000,
+            "الاتصال بقاعدة البيانات مفقود."
+        );
         
         document.getElementById('prod-status').innerText = "✅ تم التحديث";
         resetProductForm();
