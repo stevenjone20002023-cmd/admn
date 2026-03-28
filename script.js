@@ -76,6 +76,8 @@ window.compressImage = function(file) {
     });
 }
 
+const dbErrorMessage = "قاعدة البيانات غير مفعلة!\n1. اذهب لموقع Firebase\n2. اختر (Realtime Database) من القائمة وليس Firestore\n3. اضغط (Create Database)\n4. اذهب إلى قسم (Rules) والصق هذا الكود بالضبط:\n\n{\n  \"rules\": {\n    \".read\": true,\n    \".write\": true\n  }\n}";
+
 function withTimeout(promise, ms, timeoutError) {
     return Promise.race([
         promise,
@@ -107,7 +109,7 @@ window.uploadBanner = async function() {
             await withTimeout(
                 push(ref(db, 'banners'), { title: title, image: imgUrl }),
                 8000,
-                "الاتصال بقاعدة البيانات مفقود. يرجى التأكد من تفعيل Realtime Database وتعديل القواعد إلى true"
+                dbErrorMessage
             );
             document.getElementById('banner-status').innerText = "✅ تم";
             document.getElementById('banner-status').style.color = "green";
@@ -115,7 +117,7 @@ window.uploadBanner = async function() {
         }
     } catch (error) {
         document.getElementById('banner-status').innerText = "❌ خطأ";
-        alert("حدث خطأ: " + error.message);
+        alert(error.message);
     }
 }
 window.deleteBanner = function(key) { if(confirm("حذف هذا البنر؟")) remove(ref(db, 'banners/' + key)).catch(e => alert(e.message)); }
@@ -148,14 +150,14 @@ window.uploadCategory = async function() {
             await withTimeout(
                 push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId }),
                 8000,
-                "الاتصال بقاعدة البيانات مفقود. يرجى التأكد من تفعيل Realtime Database وتعديل القواعد إلى true"
+                dbErrorMessage
             );
             document.getElementById('cat-status').innerText = "✅ تم";
             fileInput.value = ""; document.getElementById('cat-name-new').value = "";
         }
     } catch (error) {
         document.getElementById('cat-status').innerText = "❌ خطأ";
-        alert("حدث خطأ: " + error.message);
+        alert(error.message);
     }
 }
 window.deleteCategory = function(key) { if(confirm("حذف هذا التصنيف؟")) remove(ref(db, 'categories/' + key)).catch(e => alert(e.message)); }
@@ -187,14 +189,14 @@ window.updateCategory = async function(key, oldImage) {
         await withTimeout(
             update(ref(db, 'categories/' + key), { name: name, image: imgUrl }),
             8000,
-            "الاتصال بقاعدة البيانات مفقود."
+            dbErrorMessage
         );
         
         document.getElementById('cat-status').innerText = "✅ تم التحديث";
         resetCategoryForm();
     } catch (error) {
         document.getElementById('cat-status').innerText = "❌ خطأ";
-        alert("حدث خطأ: " + error.message);
+        alert(error.message);
     }
 }
 
@@ -265,14 +267,14 @@ window.uploadProduct = async function() {
                     date: serverTimestamp() 
                 }),
                 8000,
-                "الاتصال بقاعدة البيانات مفقود. تأكد من تفعيل Realtime Database وتعديل القواعد (Rules) إلى true"
+                dbErrorMessage
             );
             document.getElementById('prod-status').innerText = "✅ تم النشر";
             resetProductForm();
         }
     } catch (error) {
         document.getElementById('prod-status').innerText = "❌ خطأ";
-        alert("حدث خطأ: " + error.message);
+        alert(error.message);
     }
 }
 window.deleteProduct = function(key) { if(confirm("حذف هذا المنتج؟")) remove(ref(db, 'products/' + key)).catch(e => alert(e.message)); }
@@ -348,14 +350,14 @@ window.updateProduct = async function(key, oldImage, oldImages) {
                 images: extraImages
             }),
             8000,
-            "الاتصال بقاعدة البيانات مفقود."
+            dbErrorMessage
         );
         
         document.getElementById('prod-status').innerText = "✅ تم التحديث";
         resetProductForm();
     } catch (error) {
         document.getElementById('prod-status').innerText = "❌ خطأ";
-        alert("حدث خطأ: " + error.message);
+        alert(error.message);
     }
 }
 
