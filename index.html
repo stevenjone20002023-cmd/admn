@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>لوحة تحكم المتجر</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-screen">
+        <i class="fa-solid fa-lock" style="font-size: 50px; margin-bottom: 20px; color: #ff9900;"></i>
+        <h3>أدخل رمز الدخول</h3>
+        <input type="password" id="login-input" placeholder="****">
+        <button class="action-btn" onclick="checkLogin()" style="width: 200px; margin-top: 20px;">دخول</button>
+        <p id="login-error" style="color: #ff4757; display: none;">الرمز غير صحيح!</p>
+    </div>
+
+    <div class="admin-header">لوحة الإدارة</div>
+
+    <div class="container" id="main-container" style="display: none;">
+
+        <div id="tab-add-product" class="tab-content active">
+            <span class="section-label">🛍️ إضافة / تعديل منتج</span>
+            <div style="background:white; padding:20px; border-radius:15px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                
+                <label style="font-size:13px; font-weight:bold;">الصورة الأساسية:</label>
+                <input type="file" id="p-img">
+
+                <label style="font-size:13px; font-weight:bold;">صور داخلية للمنتج (اختياري 2-3 صور):</label>
+                <input type="file" id="p-images" multiple accept="image/*">
+                
+                <label style="font-size:13px; font-weight:bold;">اسم المنتج:</label>
+                <input type="text" id="p-name" placeholder="اسم المنتج">
+
+                <label style="font-size:13px; font-weight:bold;">السعر:</label>
+                <input type="number" id="p-price" placeholder="السعر">
+                
+                <label style="font-size:13px; font-weight:bold;">الوصف:</label>
+                <textarea id="p-desc" placeholder="وصف المنتج وتفاصيله..."></textarea>
+                
+                <label style="font-size:13px; font-weight:bold;">القسم:</label>
+                <select id="p-cat-select">
+                    <option value="general">عام</option>
+                </select>
+
+                <div id="dynamic-buttons-container"></div>
+                <button class="action-btn" onclick="addDynamicButton()" style="background:#27ae60; margin-bottom:15px; width:auto; padding:8px 15px; font-size:12px;">+ إضافة زر دخول</button>
+
+                <button class="action-btn" id="prod-action-btn" onclick="uploadProduct()">نشر المنتج الآن</button>
+                <button class="action-btn" onclick="resetProductForm()" style="background:#95a5a6; margin-top:10px;">إلغاء وإفراغ الحقول</button>
+                <div id="prod-status" class="status"></div>
+
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                <h4 style="margin: 0 0 10px 0; color: #333;">إدارة المنتجات المنشورة</h4>
+                <div id="products-list-manage"></div>
+            </div>
+        </div>
+
+        <div id="tab-design" class="tab-content">
+            <div id="design-menu">
+                <button class="design-option-btn" onclick="showDesignSection('banner-section')">
+                    <i class="fa-regular fa-images"></i>
+                    <span>إدارة البنرات (صور العروض)</span>
+                </button>
+                <button class="design-option-btn" onclick="showDesignSection('category-section')">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span>إدارة التصنيفات</span>
+                </button>
+            </div>
+
+            <div id="banner-section" style="display: none;">
+                <button onclick="showDesignSection('menu')" style="background:none; border:none; color:#555; font-weight:bold; margin-bottom:10px;"><i class="fa-solid fa-arrow-right"></i> رجوع</button>
+                <span class="section-label">🖼️ إدارة البنرات</span>
+                <div id="banners-list-container" style="margin-bottom: 20px;"></div>
+                <div style="background:white; padding:15px; border-radius:15px; border:1px solid #ff9900;">
+                    <h4 style="margin-top:0;">إضافة بنر جديد</h4>
+                    <input type="text" id="banner-title" placeholder="عنوان العرض (اختياري)">
+                    <input type="file" id="banner-img">
+                    <button class="action-btn" onclick="uploadBanner()">رفع البنر</button>
+                    <div id="banner-status" class="status"></div>
+                </div>
+            </div>
+
+            <div id="category-section" style="display: none;">
+                <button onclick="showDesignSection('menu')" style="background:none; border:none; color:#555; font-weight:bold; margin-bottom:10px;"><i class="fa-solid fa-arrow-right"></i> رجوع</button>
+                <span class="section-label">📂 إدارة التصنيفات</span>
+                <div style="background:white; padding:15px; border-radius:15px; margin-bottom: 20px;">
+                    <input type="text" id="cat-name-new" placeholder="اسم التصنيف (مثال: ساعات)">
+                    <input type="file" id="cat-img-new">
+                    <button class="action-btn" id="cat-action-btn" onclick="uploadCategory()">إنشاء التصنيف</button>
+                    <button class="action-btn" onclick="resetCategoryForm()" style="background:#95a5a6; margin-top:10px;">إلغاء</button>
+                    <div id="cat-status" class="status"></div>
+                </div>
+                <span class="section-label" style="font-size: 14px;">التصنيفات الحالية</span>
+                <div id="categories-list-manage"></div>
+            </div>
+        </div>
+
+        <div id="tab-orders" class="tab-content">
+            <span class="section-label">📦 الطلبات</span>
+            <div style="background:white; padding:15px; border-radius:15px; margin-bottom: 20px;">
+                <h4 style="margin-top:0; color: #333;">قيد المراجعة</h4>
+                <div id="pending-orders-list"></div>
+            </div>
+            <div style="background:white; padding:15px; border-radius:15px;">
+                <h4 style="margin-top:0; color: #333;">الطلبات المنتهية</h4>
+                <div id="completed-orders-list"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-btn active" onclick="switchTab('tab-add-product', this)">
+            <i class="fa-solid fa-circle-plus"></i><span>المنتجات</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('tab-design', this)">
+            <i class="fa-solid fa-paintbrush"></i><span>الواجهة</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('tab-orders', this)">
+            <i class="fa-solid fa-box"></i><span>الطلبات</span>
+        </button>
+    </nav>
+
+    <script src="config.js"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+      const firebaseConfig = {
+        apiKey: "AIzaSyB2_KZ9Gn1e533viEORuzxeoMnXHrJg1yI",
+        authDomain: "iuyhiuhy.firebaseapp.com",
+        projectId: "iuyhiuhy",
+        storageBucket: "iuyhiuhy.firebasestorage.app",
+        messagingSenderId: "737406385560",
+        appId: "1:737406385560:web:89ebc5763346810d86bfed"
+      };
+      window.app = initializeApp(firebaseConfig);
+    </script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
