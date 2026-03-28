@@ -30,7 +30,9 @@
                 <input type="file" id="p-img">
 
                 <label style="font-size:13px; font-weight:bold;">صور داخلية للمنتج (اختياري 2-3 صور):</label>
-                <input type="file" id="p-images" multiple accept="image/*">
+                <input type="file" id="p-image-1" accept="image/*">
+                <input type="file" id="p-image-2" accept="image/*">
+                <input type="file" id="p-image-3" accept="image/*">
                 
                 <label style="font-size:13px; font-weight:bold;">اسم المنتج:</label>
                 <input type="text" id="p-name" placeholder="اسم المنتج">
@@ -45,9 +47,6 @@
                 <select id="p-cat-select">
                     <option value="general">عام</option>
                 </select>
-
-                <div id="dynamic-buttons-container"></div>
-                <button class="action-btn" onclick="addDynamicButton()" style="background:#27ae60; margin-bottom:15px; width:auto; padding:8px 15px; font-size:12px;">+ إضافة زر دخول</button>
 
                 <button class="action-btn" id="prod-action-btn" onclick="uploadProduct()">نشر المنتج الآن</button>
                 <button class="action-btn" onclick="resetProductForm()" style="background:#95a5a6; margin-top:10px;">إلغاء وإفراغ الحقول</button>
