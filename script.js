@@ -199,17 +199,8 @@ onSnapshot(collection(db, 'products'), snapshot => {
     } else { list.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد منتجات</p>"; }
 });
 
-window.addDynamicButton = function() {
-    const container = document.getElementById('dynamic-buttons-container');
-    const div = document.createElement('div');
-    div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '5px';
-    div.innerHTML = `<input type="text" class="btn-name" placeholder="تسمية الزر"><input type="url" class="btn-url" placeholder="رابط الدخول"><button class="delete-btn" onclick="this.parentElement.remove()" style="margin:8px 0;">X</button>`;
-    container.appendChild(div);
-}
-
 window.uploadProduct = async function() {
     const fileInput = document.getElementById('p-img');
-    const imagesInput = document.getElementById('p-images');
     const name = document.getElementById('p-name').value;
     const price = document.getElementById('p-price').value;
     const desc = document.getElementById('p-desc').value;
@@ -219,20 +210,16 @@ window.uploadProduct = async function() {
     document.getElementById('prod-status').innerText = "جاري الرفع...";
     
     try {
-        const btns = [];
-        document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
-            const bName = div.querySelector('.btn-name').value;
-            const bUrl = div.querySelector('.btn-url').value;
-            if(bName && bUrl) btns.push({ name: bName, url: bUrl });
-        });
-
         const imgUrl = await compressImage(fileInput.files[0]);
         
         const extraImages = [];
-        for(let i=0; i < imagesInput.files.length; i++) {
-            const extraImg = await compressImage(imagesInput.files[i]);
-            if(extraImg) extraImages.push(extraImg);
-        }
+        const img1 = document.getElementById('p-image-1').files[0];
+        const img2 = document.getElementById('p-image-2').files[0];
+        const img3 = document.getElementById('p-image-3').files[0];
+        
+        if(img1) { const e1 = await compressImage(img1); if(e1) extraImages.push(e1); }
+        if(img2) { const e2 = await compressImage(img2); if(e2) extraImages.push(e2); }
+        if(img3) { const e3 = await compressImage(img3); if(e3) extraImages.push(e3); }
         
         if(imgUrl) {
             await addDoc(collection(db, 'products'), { 
@@ -242,7 +229,6 @@ window.uploadProduct = async function() {
                 price: price,
                 description: desc, 
                 category: cat, 
-                buttons: btns, 
                 date: serverTimestamp() 
             });
             document.getElementById('prod-status').innerText = "✅ تم النشر";
@@ -264,17 +250,6 @@ window.editProduct = async function(key) {
         document.getElementById('p-desc').value = data.description || '';
         document.getElementById('p-cat-select').value = data.category || 'general';
         
-        const btnsContainer = document.getElementById('dynamic-buttons-container');
-        btnsContainer.innerHTML = '';
-        if(data.buttons) {
-            data.buttons.forEach(b => {
-                const div = document.createElement('div');
-                div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '5px';
-                div.innerHTML = `<input type="text" class="btn-name" placeholder="تسمية الزر" value="${b.name}"><input type="url" class="btn-url" placeholder="رابط الدخول" value="${b.url}"><button class="delete-btn" onclick="this.parentElement.remove()" style="margin:8px 0;">X</button>`;
-                btnsContainer.appendChild(div);
-            });
-        }
-        
         document.getElementById('prod-action-btn').innerText = "تحديث المنتج";
         document.getElementById('prod-action-btn').onclick = function() { updateProduct(key, data.image, data.images); };
         switchTab('tab-add-product', document.querySelector('.nav-btn:first-child'));
@@ -287,31 +262,26 @@ window.updateProduct = async function(key, oldImage, oldImages) {
     const desc = document.getElementById('p-desc').value;
     const cat = document.getElementById('p-cat-select').value;
     const fileInput = document.getElementById('p-img');
-    const imagesInput = document.getElementById('p-images');
     
     if(!name) return alert("الاسم مطلوب");
     document.getElementById('prod-status').innerText = "جاري التحديث...";
     
     try {
-        const btns = [];
-        document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
-            const bName = div.querySelector('.btn-name').value;
-            const bUrl = div.querySelector('.btn-url').value;
-            if(bName && bUrl) btns.push({ name: bName, url: bUrl });
-        });
-        
         let imgUrl = oldImage;
         if(fileInput.files.length > 0) {
             imgUrl = await compressImage(fileInput.files[0]);
         }
 
         let extraImages = oldImages || [];
-        if(imagesInput.files.length > 0) {
+        const img1 = document.getElementById('p-image-1').files[0];
+        const img2 = document.getElementById('p-image-2').files[0];
+        const img3 = document.getElementById('p-image-3').files[0];
+        
+        if(img1 || img2 || img3) {
             extraImages = [];
-            for(let i=0; i < imagesInput.files.length; i++) {
-                const extraImg = await compressImage(imagesInput.files[i]);
-                if(extraImg) extraImages.push(extraImg);
-            }
+            if(img1) { const e1 = await compressImage(img1); if(e1) extraImages.push(e1); }
+            if(img2) { const e2 = await compressImage(img2); if(e2) extraImages.push(e2); }
+            if(img3) { const e3 = await compressImage(img3); if(e3) extraImages.push(e3); }
         }
         
         await updateDoc(doc(db, 'products', key), { 
@@ -319,7 +289,6 @@ window.updateProduct = async function(key, oldImage, oldImages) {
             price: price,
             description: desc, 
             category: cat, 
-            buttons: btns, 
             image: imgUrl,
             images: extraImages
         });
@@ -337,8 +306,9 @@ window.resetProductForm = function() {
     document.getElementById('p-price').value = "";
     document.getElementById('p-desc').value = "";
     document.getElementById('p-img').value = "";
-    document.getElementById('p-images').value = "";
-    document.getElementById('dynamic-buttons-container').innerHTML = "";
+    document.getElementById('p-image-1').value = "";
+    document.getElementById('p-image-2').value = "";
+    document.getElementById('p-image-3').value = "";
     document.getElementById('prod-action-btn').innerText = "نشر المنتج الآن";
     document.getElementById('prod-action-btn').onclick = uploadProduct;
 }
