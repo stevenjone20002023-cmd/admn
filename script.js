@@ -1,3 +1,4 @@
+// ملف: admn/script.js
 import { getDatabase, ref, onValue, push, remove, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
 const config = window.MY_STORE_CONFIG;
@@ -88,16 +89,20 @@ window.uploadBanner = async function() {
     if(fileInput.files.length === 0) return alert("اختر صورة");
     document.getElementById('banner-status').innerText = "جاري الرفع...";
     
-    const imgUrl = await compressImage(fileInput.files[0]);
-    
-    if(imgUrl) {
-        push(ref(db, 'banners'), { title: title, image: imgUrl });
-        document.getElementById('banner-status').innerText = "✅ تم";
-        document.getElementById('banner-status').style.color = "green";
-        fileInput.value = ""; document.getElementById('banner-title').value = "";
+    try {
+        const imgUrl = await compressImage(fileInput.files[0]);
+        if(imgUrl) {
+            await push(ref(db, 'banners'), { title: title, image: imgUrl });
+            document.getElementById('banner-status').innerText = "✅ تم";
+            document.getElementById('banner-status').style.color = "green";
+            fileInput.value = ""; document.getElementById('banner-title').value = "";
+        }
+    } catch (error) {
+        document.getElementById('banner-status').innerText = "❌ خطأ";
+        alert("حدث خطأ: " + error.message);
     }
 }
-window.deleteBanner = function(key) { if(confirm("حذف هذا البنر؟")) remove(ref(db, 'banners/' + key)); }
+window.deleteBanner = function(key) { if(confirm("حذف هذا البنر؟")) remove(ref(db, 'banners/' + key)).catch(e => alert(e.message)); }
 
 onValue(ref(db, 'categories'), snapshot => {
     const select = document.getElementById('p-cat-select');
@@ -120,16 +125,20 @@ window.uploadCategory = async function() {
     if(!name || fileInput.files.length === 0) return alert("البيانات ناقصة");
     document.getElementById('cat-status').innerText = "جاري...";
     
-    const imgUrl = await compressImage(fileInput.files[0]);
-    
-    if(imgUrl) {
-        const catId = name.replace(/\s+/g, '_'); 
-        push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId });
-        document.getElementById('cat-status').innerText = "✅ تم";
-        fileInput.value = ""; document.getElementById('cat-name-new').value = "";
+    try {
+        const imgUrl = await compressImage(fileInput.files[0]);
+        if(imgUrl) {
+            const catId = name.replace(/\s+/g, '_'); 
+            await push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId });
+            document.getElementById('cat-status').innerText = "✅ تم";
+            fileInput.value = ""; document.getElementById('cat-name-new').value = "";
+        }
+    } catch (error) {
+        document.getElementById('cat-status').innerText = "❌ خطأ";
+        alert("حدث خطأ: " + error.message);
     }
 }
-window.deleteCategory = function(key) { if(confirm("حذف هذا التصنيف؟")) remove(ref(db, 'categories/' + key)); }
+window.deleteCategory = function(key) { if(confirm("حذف هذا التصنيف؟")) remove(ref(db, 'categories/' + key)).catch(e => alert(e.message)); }
 
 window.editCategory = function(key) {
     import("https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js").then((mod) => {
@@ -149,15 +158,19 @@ window.updateCategory = async function(key, oldImage) {
     if(!name) return alert("الاسم مطلوب");
     document.getElementById('cat-status').innerText = "جاري التحديث...";
     
-    let imgUrl = oldImage;
-    if(fileInput.files.length > 0) {
-        imgUrl = await compressImage(fileInput.files[0]);
-    }
-    
-    update(ref(db, 'categories/' + key), { name: name, image: imgUrl }).then(() => {
+    try {
+        let imgUrl = oldImage;
+        if(fileInput.files.length > 0) {
+            imgUrl = await compressImage(fileInput.files[0]);
+        }
+        
+        await update(ref(db, 'categories/' + key), { name: name, image: imgUrl });
         document.getElementById('cat-status').innerText = "✅ تم التحديث";
         resetCategoryForm();
-    });
+    } catch (error) {
+        document.getElementById('cat-status').innerText = "❌ خطأ";
+        alert("حدث خطأ: " + error.message);
+    }
 }
 
 window.resetCategoryForm = function() {
@@ -198,37 +211,42 @@ window.uploadProduct = async function() {
     if(fileInput.files.length === 0 || !name) return alert("البيانات ناقصة (الصورة الأساسية والاسم مطلوبان)");
     document.getElementById('prod-status').innerText = "جاري الرفع...";
     
-    const btns = [];
-    document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
-        const bName = div.querySelector('.btn-name').value;
-        const bUrl = div.querySelector('.btn-url').value;
-        if(bName && bUrl) btns.push({ name: bName, url: bUrl });
-    });
-
-    const imgUrl = await compressImage(fileInput.files[0]);
-    
-    const extraImages = [];
-    for(let i=0; i < imagesInput.files.length; i++) {
-        const extraImg = await compressImage(imagesInput.files[i]);
-        extraImages.push(extraImg);
-    }
-    
-    if(imgUrl) {
-        await push(ref(db, 'products'), { 
-            image: imgUrl, 
-            images: extraImages,
-            title: name, 
-            price: price,
-            description: desc, 
-            category: cat, 
-            buttons: btns, 
-            date: serverTimestamp() 
+    try {
+        const btns = [];
+        document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
+            const bName = div.querySelector('.btn-name').value;
+            const bUrl = div.querySelector('.btn-url').value;
+            if(bName && bUrl) btns.push({ name: bName, url: bUrl });
         });
-        document.getElementById('prod-status').innerText = "✅ تم النشر";
-        resetProductForm();
+
+        const imgUrl = await compressImage(fileInput.files[0]);
+        
+        const extraImages = [];
+        for(let i=0; i < imagesInput.files.length; i++) {
+            const extraImg = await compressImage(imagesInput.files[i]);
+            extraImages.push(extraImg);
+        }
+        
+        if(imgUrl) {
+            await push(ref(db, 'products'), { 
+                image: imgUrl, 
+                images: extraImages,
+                title: name, 
+                price: price,
+                description: desc, 
+                category: cat, 
+                buttons: btns, 
+                date: serverTimestamp() 
+            });
+            document.getElementById('prod-status').innerText = "✅ تم النشر";
+            resetProductForm();
+        }
+    } catch (error) {
+        document.getElementById('prod-status').innerText = "❌ خطأ";
+        alert("حدث خطأ: " + error.message);
     }
 }
-window.deleteProduct = function(key) { if(confirm("حذف هذا المنتج؟")) remove(ref(db, 'products/' + key)); }
+window.deleteProduct = function(key) { if(confirm("حذف هذا المنتج؟")) remove(ref(db, 'products/' + key)).catch(e => alert(e.message)); }
 
 window.editProduct = function(key) {
     import("https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js").then((mod) => {
@@ -268,39 +286,44 @@ window.updateProduct = async function(key, oldImage, oldImages) {
     if(!name) return alert("الاسم مطلوب");
     document.getElementById('prod-status').innerText = "جاري التحديث...";
     
-    const btns = [];
-    document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
-        const bName = div.querySelector('.btn-name').value;
-        const bUrl = div.querySelector('.btn-url').value;
-        if(bName && bUrl) btns.push({ name: bName, url: bUrl });
-    });
-    
-    let imgUrl = oldImage;
-    if(fileInput.files.length > 0) {
-        imgUrl = await compressImage(fileInput.files[0]);
-    }
-
-    let extraImages = oldImages || [];
-    if(imagesInput.files.length > 0) {
-        extraImages = [];
-        for(let i=0; i < imagesInput.files.length; i++) {
-            const extraImg = await compressImage(imagesInput.files[i]);
-            extraImages.push(extraImg);
+    try {
+        const btns = [];
+        document.querySelectorAll('#dynamic-buttons-container > div').forEach(div => {
+            const bName = div.querySelector('.btn-name').value;
+            const bUrl = div.querySelector('.btn-url').value;
+            if(bName && bUrl) btns.push({ name: bName, url: bUrl });
+        });
+        
+        let imgUrl = oldImage;
+        if(fileInput.files.length > 0) {
+            imgUrl = await compressImage(fileInput.files[0]);
         }
-    }
-    
-    update(ref(db, 'products/' + key), { 
-        title: name, 
-        price: price,
-        description: desc, 
-        category: cat, 
-        buttons: btns, 
-        image: imgUrl,
-        images: extraImages
-    }).then(() => {
+
+        let extraImages = oldImages || [];
+        if(imagesInput.files.length > 0) {
+            extraImages = [];
+            for(let i=0; i < imagesInput.files.length; i++) {
+                const extraImg = await compressImage(imagesInput.files[i]);
+                extraImages.push(extraImg);
+            }
+        }
+        
+        await update(ref(db, 'products/' + key), { 
+            title: name, 
+            price: price,
+            description: desc, 
+            category: cat, 
+            buttons: btns, 
+            image: imgUrl,
+            images: extraImages
+        });
+        
         document.getElementById('prod-status').innerText = "✅ تم التحديث";
         resetProductForm();
-    });
+    } catch (error) {
+        document.getElementById('prod-status').innerText = "❌ خطأ";
+        alert("حدث خطأ: " + error.message);
+    }
 }
 
 window.resetProductForm = function() {
@@ -380,12 +403,12 @@ onValue(ref(db, 'orders'), snapshot => {
 
 window.markOrderCompleted = function(key) {
     if(confirm("نقل الطلب إلى المنتهية؟")) {
-        update(ref(db, 'orders/' + key), { status: 'completed' });
+        update(ref(db, 'orders/' + key), { status: 'completed' }).catch(e => alert(e.message));
     }
 }
 
 window.deleteOrder = function(key) {
     if(confirm("هل أنت متأكد من حذف هذا الطلب نهائياً؟")) {
-        remove(ref(db, 'orders/' + key));
+        remove(ref(db, 'orders/' + key)).catch(e => alert(e.message));
     }
 }
