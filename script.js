@@ -1,8 +1,8 @@
 // ملف: admn/script.js
-import { getDatabase, ref, onValue, push, remove, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const config = window.MY_STORE_CONFIG;
-const db = getDatabase(window.app);
+const db = getFirestore(window.app);
 
 window.checkLogin = function() {
     const code = document.getElementById('login-input').value.toString().trim();
@@ -76,22 +76,13 @@ window.compressImage = function(file) {
     });
 }
 
-const dbErrorMessage = "قاعدة البيانات غير مفعلة!\n1. اذهب لموقع Firebase\n2. اختر (Realtime Database) من القائمة وليس Firestore\n3. اضغط (Create Database)\n4. اذهب إلى قسم (Rules) والصق هذا الكود بالضبط:\n\n{\n  \"rules\": {\n    \".read\": true,\n    \".write\": true\n  }\n}";
-
-function withTimeout(promise, ms, timeoutError) {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutError)), ms))
-    ]);
-}
-
-onValue(ref(db, 'banners'), snapshot => {
+onSnapshot(collection(db, 'banners'), snapshot => {
     const list = document.getElementById('banners-list-container');
     list.innerHTML = "";
-    const data = snapshot.val();
-    if(data) {
-        Object.keys(data).forEach(key => {
-            const b = data[key];
+    if(!snapshot.empty) {
+        snapshot.forEach(docSnap => {
+            const key = docSnap.id;
+            const b = docSnap.data();
             list.innerHTML += `<div class="banner-list-item"><div style="display:flex; align-items:center; gap:10px;"><img src="${b.image}" class="banner-preview"><span style="font-size:12px;">${b.title || 'بدون عنوان'}</span></div><button class="delete-btn" onclick="deleteBanner('${key}')">X</button></div>`;
         });
     } else { list.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد بنرات حالياً</p>"; }
@@ -106,11 +97,7 @@ window.uploadBanner = async function() {
     try {
         const imgUrl = await compressImage(fileInput.files[0]);
         if(imgUrl) {
-            await withTimeout(
-                push(ref(db, 'banners'), { title: title, image: imgUrl }),
-                8000,
-                dbErrorMessage
-            );
+            await addDoc(collection(db, 'banners'), { title: title, image: imgUrl });
             document.getElementById('banner-status').innerText = "✅ تم";
             document.getElementById('banner-status').style.color = "green";
             fileInput.value = ""; document.getElementById('banner-title').value = "";
@@ -120,17 +107,17 @@ window.uploadBanner = async function() {
         alert(error.message);
     }
 }
-window.deleteBanner = function(key) { if(confirm("حذف هذا البنر؟")) remove(ref(db, 'banners/' + key)).catch(e => alert(e.message)); }
+window.deleteBanner = function(key) { if(confirm("حذف هذا البنر؟")) deleteDoc(doc(db, 'banners', key)).catch(e => alert(e.message)); }
 
-onValue(ref(db, 'categories'), snapshot => {
+onSnapshot(collection(db, 'categories'), snapshot => {
     const select = document.getElementById('p-cat-select');
     const listManage = document.getElementById('categories-list-manage');
     select.innerHTML = '<option value="general">عام</option>'; 
     listManage.innerHTML = "";
-    const data = snapshot.val();
-    if(data) {
-        Object.keys(data).forEach(key => {
-            const cat = data[key];
+    if(!snapshot.empty) {
+        snapshot.forEach(docSnap => {
+            const key = docSnap.id;
+            const cat = docSnap.data();
             select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
             listManage.innerHTML += `<div class="banner-list-item"><div style="display:flex; align-items:center; gap:10px;"><img src="${cat.image}" class="banner-preview" style="border-radius:50%;"><span style="font-size:12px;">${cat.name}</span></div><div><button class="delete-btn" style="background:#3498db; margin-left:5px;" onclick="editCategory('${key}')">تعديل</button><button class="delete-btn" onclick="deleteCategory('${key}')">X</button></div></div>`;
         });
@@ -147,11 +134,7 @@ window.uploadCategory = async function() {
         const imgUrl = await compressImage(fileInput.files[0]);
         if(imgUrl) {
             const catId = name.replace(/\s+/g, '_'); 
-            await withTimeout(
-                push(ref(db, 'categories'), { name: name, image: imgUrl, id: catId }),
-                8000,
-                dbErrorMessage
-            );
+            await addDoc(collection(db, 'categories'), { name: name, image: imgUrl, id: catId });
             document.getElementById('cat-status').innerText = "✅ تم";
             fileInput.value = ""; document.getElementById('cat-name-new').value = "";
         }
@@ -160,18 +143,17 @@ window.uploadCategory = async function() {
         alert(error.message);
     }
 }
-window.deleteCategory = function(key) { if(confirm("حذف هذا التصنيف؟")) remove(ref(db, 'categories/' + key)).catch(e => alert(e.message)); }
+window.deleteCategory = function(key) { if(confirm("حذف هذا التصنيف؟")) deleteDoc(doc(db, 'categories', key)).catch(e => alert(e.message)); }
 
-window.editCategory = function(key) {
-    import("https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js").then((mod) => {
-        mod.get(mod.ref(db, 'categories/' + key)).then(snapshot => {
-            const data = snapshot.val();
-            document.getElementById('cat-name-new').value = data.name;
-            document.getElementById('cat-action-btn').innerText = "تحديث التصنيف";
-            document.getElementById('cat-action-btn').onclick = function() { updateCategory(key, data.image); };
-            window.scrollTo(0,0);
-        });
-    });
+window.editCategory = async function(key) {
+    const docSnap = await getDoc(doc(db, 'categories', key));
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        document.getElementById('cat-name-new').value = data.name;
+        document.getElementById('cat-action-btn').innerText = "تحديث التصنيف";
+        document.getElementById('cat-action-btn').onclick = function() { updateCategory(key, data.image); };
+        window.scrollTo(0,0);
+    }
 }
 
 window.updateCategory = async function(key, oldImage) {
@@ -186,11 +168,7 @@ window.updateCategory = async function(key, oldImage) {
             imgUrl = await compressImage(fileInput.files[0]);
         }
         
-        await withTimeout(
-            update(ref(db, 'categories/' + key), { name: name, image: imgUrl }),
-            8000,
-            dbErrorMessage
-        );
+        await updateDoc(doc(db, 'categories', key), { name: name, image: imgUrl });
         
         document.getElementById('cat-status').innerText = "✅ تم التحديث";
         resetCategoryForm();
@@ -207,13 +185,15 @@ window.resetCategoryForm = function() {
     document.getElementById('cat-action-btn').onclick = uploadCategory;
 }
 
-onValue(ref(db, 'products'), snapshot => {
+onSnapshot(collection(db, 'products'), snapshot => {
     const list = document.getElementById('products-list-manage');
     list.innerHTML = "";
-    const data = snapshot.val();
-    if(data) {
-        Object.keys(data).reverse().forEach(key => {
-            const p = data[key];
+    if(!snapshot.empty) {
+        const docs = [];
+        snapshot.forEach(d => docs.push({id: d.id, data: d.data()}));
+        docs.reverse().forEach(item => {
+            const key = item.id;
+            const p = item.data;
             list.innerHTML += `<div class="banner-list-item"><div style="display:flex; align-items:center; gap:10px;"><img src="${p.image}" class="banner-preview"><div style="font-size:12px;"><div>${p.title}</div><div style="color:red;">${p.price || 0} د.ع</div></div></div><div><button class="delete-btn" style="background:#3498db; margin-left:5px;" onclick="editProduct('${key}')">تعديل</button><button class="delete-btn" onclick="deleteProduct('${key}')">X</button></div></div>`;
         });
     } else { list.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد منتجات</p>"; }
@@ -255,20 +235,16 @@ window.uploadProduct = async function() {
         }
         
         if(imgUrl) {
-            await withTimeout(
-                push(ref(db, 'products'), { 
-                    image: imgUrl, 
-                    images: extraImages,
-                    title: name, 
-                    price: price,
-                    description: desc, 
-                    category: cat, 
-                    buttons: btns, 
-                    date: serverTimestamp() 
-                }),
-                8000,
-                dbErrorMessage
-            );
+            await addDoc(collection(db, 'products'), { 
+                image: imgUrl, 
+                images: extraImages,
+                title: name, 
+                price: price,
+                description: desc, 
+                category: cat, 
+                buttons: btns, 
+                date: serverTimestamp() 
+            });
             document.getElementById('prod-status').innerText = "✅ تم النشر";
             resetProductForm();
         }
@@ -277,33 +253,32 @@ window.uploadProduct = async function() {
         alert(error.message);
     }
 }
-window.deleteProduct = function(key) { if(confirm("حذف هذا المنتج؟")) remove(ref(db, 'products/' + key)).catch(e => alert(e.message)); }
+window.deleteProduct = function(key) { if(confirm("حذف هذا المنتج؟")) deleteDoc(doc(db, 'products', key)).catch(e => alert(e.message)); }
 
-window.editProduct = function(key) {
-    import("https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js").then((mod) => {
-        mod.get(mod.ref(db, 'products/' + key)).then(snapshot => {
-            const data = snapshot.val();
-            document.getElementById('p-name').value = data.title;
-            document.getElementById('p-price').value = data.price || '';
-            document.getElementById('p-desc').value = data.description || '';
-            document.getElementById('p-cat-select').value = data.category || 'general';
-            
-            const btnsContainer = document.getElementById('dynamic-buttons-container');
-            btnsContainer.innerHTML = '';
-            if(data.buttons) {
-                data.buttons.forEach(b => {
-                    const div = document.createElement('div');
-                    div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '5px';
-                    div.innerHTML = `<input type="text" class="btn-name" placeholder="تسمية الزر" value="${b.name}"><input type="url" class="btn-url" placeholder="رابط الدخول" value="${b.url}"><button class="delete-btn" onclick="this.parentElement.remove()" style="margin:8px 0;">X</button>`;
-                    btnsContainer.appendChild(div);
-                });
-            }
-            
-            document.getElementById('prod-action-btn').innerText = "تحديث المنتج";
-            document.getElementById('prod-action-btn').onclick = function() { updateProduct(key, data.image, data.images); };
-            switchTab('tab-add-product', document.querySelector('.nav-btn:first-child'));
-        });
-    });
+window.editProduct = async function(key) {
+    const docSnap = await getDoc(doc(db, 'products', key));
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        document.getElementById('p-name').value = data.title;
+        document.getElementById('p-price').value = data.price || '';
+        document.getElementById('p-desc').value = data.description || '';
+        document.getElementById('p-cat-select').value = data.category || 'general';
+        
+        const btnsContainer = document.getElementById('dynamic-buttons-container');
+        btnsContainer.innerHTML = '';
+        if(data.buttons) {
+            data.buttons.forEach(b => {
+                const div = document.createElement('div');
+                div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '5px';
+                div.innerHTML = `<input type="text" class="btn-name" placeholder="تسمية الزر" value="${b.name}"><input type="url" class="btn-url" placeholder="رابط الدخول" value="${b.url}"><button class="delete-btn" onclick="this.parentElement.remove()" style="margin:8px 0;">X</button>`;
+                btnsContainer.appendChild(div);
+            });
+        }
+        
+        document.getElementById('prod-action-btn').innerText = "تحديث المنتج";
+        document.getElementById('prod-action-btn').onclick = function() { updateProduct(key, data.image, data.images); };
+        switchTab('tab-add-product', document.querySelector('.nav-btn:first-child'));
+    }
 }
 
 window.updateProduct = async function(key, oldImage, oldImages) {
@@ -339,19 +314,15 @@ window.updateProduct = async function(key, oldImage, oldImages) {
             }
         }
         
-        await withTimeout(
-            update(ref(db, 'products/' + key), { 
-                title: name, 
-                price: price,
-                description: desc, 
-                category: cat, 
-                buttons: btns, 
-                image: imgUrl,
-                images: extraImages
-            }),
-            8000,
-            dbErrorMessage
-        );
+        await updateDoc(doc(db, 'products', key), { 
+            title: name, 
+            price: price,
+            description: desc, 
+            category: cat, 
+            buttons: btns, 
+            image: imgUrl,
+            images: extraImages
+        });
         
         document.getElementById('prod-status').innerText = "✅ تم التحديث";
         resetProductForm();
@@ -372,7 +343,7 @@ window.resetProductForm = function() {
     document.getElementById('prod-action-btn').onclick = uploadProduct;
 }
 
-onValue(ref(db, 'orders'), snapshot => {
+onSnapshot(collection(db, 'orders'), snapshot => {
     const pendingList = document.getElementById('pending-orders-list');
     const completedList = document.getElementById('completed-orders-list');
     if(!pendingList || !completedList) return;
@@ -380,13 +351,16 @@ onValue(ref(db, 'orders'), snapshot => {
     pendingList.innerHTML = "";
     completedList.innerHTML = "";
     
-    const data = snapshot.val();
-    if(data) {
+    if(!snapshot.empty) {
         let hasPending = false;
         let hasCompleted = false;
 
-        Object.keys(data).reverse().forEach(key => {
-            const order = data[key];
+        const docs = [];
+        snapshot.forEach(d => docs.push({id: d.id, data: d.data()}));
+
+        docs.reverse().forEach(item => {
+            const key = item.id;
+            const order = item.data;
             
             let orderItemsHtml = "";
             if(order.cart && Array.isArray(order.cart)) {
@@ -403,7 +377,7 @@ onValue(ref(db, 'orders'), snapshot => {
             const orderHtml = `
                 <div class="order-item">
                     <div class="order-header">
-                        <span>طلب #${key.substring(1, 6)}</span>
+                        <span>طلب #${key.substring(0, 5)}</span>
                     </div>
                     <div class="order-details">
                         <div>الاسم: ${order.name}</div>
@@ -438,12 +412,12 @@ onValue(ref(db, 'orders'), snapshot => {
 
 window.markOrderCompleted = function(key) {
     if(confirm("نقل الطلب إلى المنتهية؟")) {
-        update(ref(db, 'orders/' + key), { status: 'completed' }).catch(e => alert(e.message));
+        updateDoc(doc(db, 'orders', key), { status: 'completed' }).catch(e => alert(e.message));
     }
 }
 
 window.deleteOrder = function(key) {
     if(confirm("هل أنت متأكد من حذف هذا الطلب نهائياً؟")) {
-        remove(ref(db, 'orders/' + key)).catch(e => alert(e.message));
+        deleteDoc(doc(db, 'orders', key)).catch(e => alert(e.message));
     }
 }
