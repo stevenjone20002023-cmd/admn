@@ -1,5 +1,5 @@
 // ملف: admn/script.js
-import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const config = window.MY_STORE_CONFIG;
 const db = getFirestore(window.app);
@@ -30,6 +30,28 @@ window.showDesignSection = function(sectionId) {
         document.getElementById('design-menu').style.display = 'block';
     } else {
         document.getElementById(sectionId).style.display = 'block';
+    }
+}
+
+// جلب شريط الأخبار الحالي
+onSnapshot(doc(db, 'settings', 'news'), docSnap => {
+    if(docSnap.exists()) {
+        const i = document.getElementById('news-input');
+        if(i) i.value = docSnap.data().text || '';
+    }
+});
+
+// تحديث شريط الأخبار
+window.updateNews = async function() {
+    const text = document.getElementById('news-input').value;
+    document.getElementById('news-status').innerText = "جاري التحديث...";
+    try {
+        await setDoc(doc(db, 'settings', 'news'), { text: text });
+        document.getElementById('news-status').innerText = "✅ تم تحديث الأخبار";
+        document.getElementById('news-status').style.color = "green";
+        setTimeout(() => document.getElementById('news-status').innerText = "", 3000);
+    } catch(e) {
+        document.getElementById('news-status').innerText = "❌ حدث خطأ";
     }
 }
 
@@ -315,15 +337,15 @@ window.resetProductForm = function() {
 
 onSnapshot(collection(db, 'orders'), snapshot => {
     const pendingList = document.getElementById('pending-orders-list');
-    const completedList = document.getElementById('completed-orders-list');
-    if(!pendingList || !completedList) return;
+    const preparedList = document.getElementById('prepared-orders-list');
+    if(!pendingList || !preparedList) return;
     
     pendingList.innerHTML = "";
-    completedList.innerHTML = "";
+    preparedList.innerHTML = "";
     
     if(!snapshot.empty) {
         let hasPending = false;
-        let hasCompleted = false;
+        let hasPrepared = false;
 
         const docs = [];
         snapshot.forEach(d => docs.push({id: d.id, data: d.data()}));
@@ -331,6 +353,7 @@ onSnapshot(collection(db, 'orders'), snapshot => {
         docs.reverse().forEach(item => {
             const key = item.id;
             const order = item.data;
+            const orderNumDisplay = order.orderNumber || key.substring(0, 5);
             
             let orderItemsHtml = "";
             if(order.cart && Array.isArray(order.cart)) {
@@ -338,56 +361,104 @@ onSnapshot(collection(db, 'orders'), snapshot => {
                     orderItemsHtml += `
                         <div style="display:flex; align-items:center; gap:10px; margin-top:5px; padding:5px; border-bottom:1px solid #eee;">
                             <img src="${item.image}" style="width:50px; height:50px; object-fit:contain; border-radius:4px; border:1px solid #ddd;">
-                            <div style="font-size:13px; font-weight:bold;">${item.title} (الكمية: ${item.qty})</div>
+                            <div style="font-size:13px; font-weight:bold;">${item.title} (الكمية: ${item.qty}) <br><span style="color:#e74c3c; display:inline-block; margin-top:5px;">العمر المحدد: ${item.age || 1}</span></div>
                         </div>
                     `;
                 });
             }
 
+            const totalHtml = `<div style="margin-top:10px; padding-top:10px; border-top:2px dashed #ccc; font-weight:bold; color:#2ecc71; font-size:15px;">المبلغ الكلي مع التوصيل: ${(order.totalAmount || 0).toLocaleString()} دينار عراقي</div>`;
+            const notesSupplierHtml = order.notesSupplier ? `<div style="margin-top:5px; color:#e67e22; font-weight:bold;">ملاحظة: ${order.notesSupplier}</div>` : '';
+
+            const isPrepared = order.status === 'prepared' || order.status === 'completed'; // support old completed state as well
+
             const orderHtml = `
-                <div class="order-item">
+                <div class="order-item ${isPrepared ? 'prepared-item' : 'pending-item'}" data-ordernum="${orderNumDisplay}" data-id="${key}">
                     <div class="order-header">
-                        <span>طلب #${key.substring(0, 5)}</span>
+                        <span>طلب #${orderNumDisplay}</span>
                     </div>
                     <div class="order-details">
                         <div>الاسم: ${order.name}</div>
                         <div>رقم الهاتف: ${order.phone}</div>
                         <div>المحافظة: ${order.gov}</div>
                         <div>العنوان/أقرب نقطة دالة: ${order.address}</div>
+                        ${notesSupplierHtml}
                         <div style="margin-top:10px; font-weight:bold;">المنتجات:</div>
                         ${orderItemsHtml}
+                        ${totalHtml}
                     </div>
-                    ${order.status === 'completed' ? '' : `<button class="action-btn" style="width:100%; margin-top:15px; background:#2ecc71;" onclick="markOrderCompleted('${key}')">تمت المراجعة</button>`}
-                    <button class="delete-btn" style="width:100%; margin-top:10px; padding:12px; background:#ff4757;" onclick="deleteOrder('${key}')">حذف الطلب</button>
+                    ${!isPrepared ? `<button class="action-btn" style="width:100%; margin-top:15px; background:#2ecc71;" onclick="markOrderPrepared('${key}')">تم التجهيز</button>` : ''}
+                    ${isPrepared ? `<button class="delete-btn" style="width:100%; margin-top:10px; padding:12px; background:#ff4757;" onclick="deleteOrder('${key}')">حذف الطلب</button>` : ''}
                 </div>
             `;
 
-            if(order.status === 'completed') {
-                completedList.innerHTML += orderHtml;
-                hasCompleted = true;
+            if(isPrepared) {
+                preparedList.innerHTML += orderHtml;
+                hasPrepared = true;
             } else {
                 pendingList.innerHTML += orderHtml;
                 hasPending = true;
             }
         });
 
-        if(!hasPending) pendingList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات قيد المراجعة</p>";
-        if(!hasCompleted) completedList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات منتهية</p>";
+        if(!hasPending) pendingList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات جديدة</p>";
+        if(!hasPrepared) preparedList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات مجهزة</p>";
 
     } else {
-        pendingList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات قيد المراجعة</p>";
-        completedList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات منتهية</p>";
+        pendingList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات جديدة</p>";
+        preparedList.innerHTML = "<p style='font-size:12px; color:#999; text-align:center;'>لا توجد طلبات مجهزة</p>";
     }
 });
 
-window.markOrderCompleted = function(key) {
-    if(confirm("نقل الطلب إلى المنتهية؟")) {
-        updateDoc(doc(db, 'orders', key), { status: 'completed' }).catch(e => alert(e.message));
-    }
+window.markOrderPrepared = function(key) {
+    updateDoc(doc(db, 'orders', key), { status: 'prepared' }).catch(e => alert(e.message));
 }
 
 window.deleteOrder = function(key) {
     if(confirm("هل أنت متأكد من حذف هذا الطلب نهائياً؟")) {
         deleteDoc(doc(db, 'orders', key)).catch(e => alert(e.message));
     }
+}
+
+window.printAllOrders = function() {
+    alert("الخدمه غير متصله في الشركة");
+}
+
+window.prepareAllOrders = async function() {
+    const items = document.querySelectorAll('.pending-item');
+    if(items.length === 0) return alert("لا توجد طلبات جديدة لتجهيزها");
+    if(!confirm("هل أنت متأكد من تجهيز جميع الطلبات الجديدة؟")) return;
+    
+    const batch = writeBatch(db);
+    items.forEach(item => {
+        const key = item.getAttribute('data-id');
+        batch.update(doc(db, 'orders', key), { status: 'prepared' });
+    });
+    await batch.commit().catch(e => alert(e.message));
+}
+
+window.deleteAllPrepared = async function() {
+    const items = document.querySelectorAll('.prepared-item');
+    if(items.length === 0) return alert("لا توجد طلبات مجهزة لحذفها");
+    if(!confirm("هل أنت متأكد من حذف جميع الطلبات المجهزة نهائياً؟")) return;
+
+    const batch = writeBatch(db);
+    items.forEach(item => {
+        const key = item.getAttribute('data-id');
+        batch.delete(doc(db, 'orders', key));
+    });
+    await batch.commit().catch(e => alert(e.message));
+}
+
+window.searchPreparedOrders = function() {
+    const term = document.getElementById('search-prepared').value.toLowerCase().trim();
+    const items = document.querySelectorAll('.prepared-item');
+    items.forEach(item => {
+        const orderNum = item.getAttribute('data-ordernum').toLowerCase();
+        if(orderNum.includes(term)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
 }
