@@ -98,15 +98,37 @@
             </div>
         </div>
 
+        <div id="tab-news" class="tab-content">
+            <span class="section-label">📰 شريط الأخبار</span>
+            <div style="background:white; padding:20px; border-radius:15px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                <label style="font-size:13px; font-weight:bold;">نص شريط الأخبار:</label>
+                <input type="text" id="news-input" placeholder="اكتب الخبر هنا ليظهر في المتجر متحركاً...">
+                <button class="action-btn" onclick="updateNews()" style="margin-top:10px;">تحديث الأخبار</button>
+                <div id="news-status" class="status"></div>
+            </div>
+        </div>
+
         <div id="tab-orders" class="tab-content">
-            <span class="section-label">📦 الطلبات</span>
+            <span class="section-label">📦 الطلبات الجديدة</span>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <button class="action-btn" style="background:#3498db; flex:1;" onclick="printAllOrders()">طباعة الكل</button>
+                <button class="action-btn" style="background:#2ecc71; flex:1;" onclick="prepareAllOrders()">تجهيز الكل</button>
+            </div>
             <div style="background:white; padding:15px; border-radius:15px; margin-bottom: 20px;">
-                <h4 style="margin-top:0; color: #333;">قيد المراجعة</h4>
+                <h4 style="margin-top:0; color: #333;">طلبات قيد المراجعة</h4>
                 <div id="pending-orders-list"></div>
             </div>
+        </div>
+
+        <div id="tab-prepared-orders" class="tab-content">
+            <span class="section-label">✅ الطلبات المجهزة</span>
+            <div style="background:white; padding:15px; border-radius:15px; margin-bottom: 15px;">
+                <input type="text" id="search-prepared" placeholder="ابحث برقم الطلب..." onkeyup="searchPreparedOrders()">
+                <button class="action-btn" style="background:#e74c3c; margin-top:10px;" onclick="deleteAllPrepared()">حذف الكل</button>
+            </div>
             <div style="background:white; padding:15px; border-radius:15px;">
-                <h4 style="margin-top:0; color: #333;">الطلبات المنتهية</h4>
-                <div id="completed-orders-list"></div>
+                <h4 style="margin-top:0; color: #333;">المجهزة</h4>
+                <div id="prepared-orders-list"></div>
             </div>
         </div>
 
@@ -119,8 +141,14 @@
         <button class="nav-btn" onclick="switchTab('tab-design', this)">
             <i class="fa-solid fa-paintbrush"></i><span>الواجهة</span>
         </button>
+        <button class="nav-btn" onclick="switchTab('tab-news', this)">
+            <i class="fa-solid fa-newspaper"></i><span>الأخبار</span>
+        </button>
         <button class="nav-btn" onclick="switchTab('tab-orders', this)">
-            <i class="fa-solid fa-box"></i><span>الطلبات</span>
+            <i class="fa-solid fa-box"></i><span>الجديدة</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('tab-prepared-orders', this)">
+            <i class="fa-solid fa-check-double"></i><span>المجهزة</span>
         </button>
     </nav>
 
