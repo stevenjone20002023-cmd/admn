@@ -4,6 +4,42 @@ import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc
 const config = window.MY_STORE_CONFIG;
 const db = getFirestore(window.app);
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(err => console.log(err));
+  });
+}
+
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => { 
+    e.preventDefault(); 
+    deferredPrompt = e; 
+    const installBanner = document.getElementById('install-banner');
+    if(installBanner) installBanner.style.display = 'flex'; 
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const installBtn = document.getElementById('install-btn');
+    const closeInstall = document.getElementById('close-install');
+    
+    if(installBtn) {
+        installBtn.addEventListener('click', async () => { 
+            if(deferredPrompt) { 
+                deferredPrompt.prompt(); 
+                deferredPrompt = null; 
+                const installBanner = document.getElementById('install-banner');
+                if(installBanner) installBanner.style.display = 'none'; 
+            } 
+        });
+    }
+    if(closeInstall) {
+        closeInstall.addEventListener('click', () => {
+            const installBanner = document.getElementById('install-banner');
+            if(installBanner) installBanner.style.display = 'none';
+        });
+    }
+});
+
 window.checkLogin = function() {
     const code = document.getElementById('login-input').value.toString().trim();
     if(code === config.security.adminCode.toString().trim()) {
@@ -33,7 +69,6 @@ window.showDesignSection = function(sectionId) {
     }
 }
 
-// جلب شريط الأخبار الحالي
 onSnapshot(doc(db, 'settings', 'news'), docSnap => {
     if(docSnap.exists()) {
         const i = document.getElementById('news-input');
@@ -41,7 +76,6 @@ onSnapshot(doc(db, 'settings', 'news'), docSnap => {
     }
 });
 
-// تحديث شريط الأخبار
 window.updateNews = async function() {
     const text = document.getElementById('news-input').value;
     document.getElementById('news-status').innerText = "جاري التحديث...";
@@ -335,6 +369,8 @@ window.resetProductForm = function() {
     document.getElementById('prod-action-btn').onclick = uploadProduct;
 }
 
+const orderColors = ['#ffe6e6', '#e6f2ff', '#e6ffe6', '#ffffe6', '#f2e6ff'];
+
 onSnapshot(collection(db, 'orders'), snapshot => {
     const pendingList = document.getElementById('pending-orders-list');
     const preparedList = document.getElementById('prepared-orders-list');
@@ -349,6 +385,9 @@ onSnapshot(collection(db, 'orders'), snapshot => {
 
         const docs = [];
         snapshot.forEach(d => docs.push({id: d.id, data: d.data()}));
+
+        let colorIndexPending = 0;
+        let colorIndexPrepared = 0;
 
         docs.reverse().forEach(item => {
             const key = item.id;
@@ -370,10 +409,19 @@ onSnapshot(collection(db, 'orders'), snapshot => {
             const totalHtml = `<div style="margin-top:10px; padding-top:10px; border-top:2px dashed #ccc; font-weight:bold; color:#2ecc71; font-size:15px;">المبلغ الكلي مع التوصيل: ${(order.totalAmount || 0).toLocaleString()} دينار عراقي</div>`;
             const notesSupplierHtml = order.notesSupplier ? `<div style="margin-top:5px; color:#e67e22; font-weight:bold;">ملاحظة: ${order.notesSupplier}</div>` : '';
 
-            const isPrepared = order.status === 'prepared' || order.status === 'completed'; // support old completed state as well
+            const isPrepared = order.status === 'prepared' || order.status === 'completed'; 
+
+            let currentBg = "#fff";
+            if(isPrepared) {
+                currentBg = orderColors[colorIndexPrepared % orderColors.length];
+                colorIndexPrepared++;
+            } else {
+                currentBg = orderColors[colorIndexPending % orderColors.length];
+                colorIndexPending++;
+            }
 
             const orderHtml = `
-                <div class="order-item ${isPrepared ? 'prepared-item' : 'pending-item'}" data-ordernum="${orderNumDisplay}" data-id="${key}">
+                <div class="order-item ${isPrepared ? 'prepared-item' : 'pending-item'}" data-ordernum="${orderNumDisplay}" data-id="${key}" style="background-color: ${currentBg};">
                     <div class="order-header">
                         <span>طلب #${orderNumDisplay}</span>
                     </div>
