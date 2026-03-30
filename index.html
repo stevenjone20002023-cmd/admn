@@ -4,11 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>لوحة تحكم المتجر</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="theme-color" content="#ff9900">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <div id="install-banner" class="install-banner">
+        <div style="display:flex; gap:10px; align-items:center;">
+            <i class="fa-solid fa-gear"></i> <span style="font-size: 13px; font-weight: bold;">تثبيت ادمن مسك ستور</span>
+        </div>
+        <div style="display:flex; gap:5px; align-items:center;">
+            <button id="install-btn">تثبيت</button>
+            <button id="close-install"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
 
     <div id="login-screen">
         <i class="fa-solid fa-lock" style="font-size: 50px; margin-bottom: 20px; color: #ff9900;"></i>
