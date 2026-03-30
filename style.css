@@ -1,5 +1,9 @@
-/* style.css */
+/* admn/style.css */
 body { font-family: 'Cairo', sans-serif; background: #f8f9fa; padding: 0; margin: 0; padding-bottom: 80px; }
+
+.install-banner { position: fixed; top: 0; left: 0; width: 100%; background: #222; color: #fff; padding: 10px 15px; z-index: 9999; display: none; align-items: center; justify-content: space-between; }
+#install-btn { background: #ff9900; color: #fff; border: none; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+#close-install { background: none; border: none; color: #ccc; cursor: pointer; font-size: 18px; margin-right: 10px; }
 
 #login-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
